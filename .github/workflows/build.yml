@@ -29,12 +29,11 @@ jobs:
     
     - name: Build Debug APK
       run: gradle assembleDebug --no-daemon --stacktrace
-      continue-on-error: true
     
     - name: List APK files
       run: |
         echo "Mencari APK..."
-        find . -name "*.apk" -type f 2>/dev/null || echo "Tidak ada APK ditemukan"
+        find . -name "*.apk" -type f 2>/dev/null || echo "Tidak ada APK"
     
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v4
