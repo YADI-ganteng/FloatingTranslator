@@ -1,21 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Button styles only - Theme moved to themes.xml -->
-    <style name="Widget.FloatingTranslator.Button.Primary" parent="Widget.MaterialComponents.Button">
-        <item name="backgroundTint">@color/primary</item>
-        <item name="textColor">@color/white</item>
-        <item name="cornerRadius">8dp</item>
-    </style>
-    
-    <style name="Widget.FloatingTranslator.Button.Success" parent="Widget.MaterialComponents.Button">
-        <item name="backgroundTint">#4CAF50</item>
-        <item name="textColor">@color/white</item>
-        <item name="cornerRadius">8dp</item>
-    </style>
-    
-    <style name="Widget.FloatingTranslator.Button.Danger" parent="Widget.MaterialComponents.Button">
-        <item name="backgroundTint">#f44336</item>
-        <item name="textColor">@color/white</item>
-        <item name="cornerRadius">8dp</item>
+    <style name="Theme.FloatingTranslator" parent="Theme.MaterialComponents.DayNight.DarkActionBar">
+        <item name="colorPrimary">#2196F3</item>
+        <item name="colorPrimaryDark">#1976D2</item>
+        <item name="colorAccent">#FF4081</item>
     </style>
 </resources>
