@@ -22,8 +22,8 @@ class MainActivity : AppCompatActivity() {
         btnStop = findViewById(R.id.btnStop)
         
         btnStart.setOnClickListener {
-            if (checkOverlay()) {
-                startScreenCapture()
+            if (checkOverlayPermission()) {
+                requestScreenCapture()
             }
         }
         
@@ -35,26 +35,26 @@ class MainActivity : AppCompatActivity() {
         updateButtons()
     }
     
-    private fun checkOverlay(): Boolean {
+    private fun checkOverlayPermission(): Boolean {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             if (!Settings.canDrawOverlays(this)) {
-                startActivityForResult(
-                    Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                        Uri.parse("package:$packageName")),
-                    100
+                val intent = Intent(
+                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    Uri.parse("package:$packageName")
                 )
+                startActivityForResult(intent, 100)
                 return false
             }
         }
         return true
     }
     
-    private fun startScreenCapture() {
+    private fun requestScreenCapture() {
         val manager = getSystemService(MEDIA_PROJECTION_SERVICE) as android.media.projection.MediaProjectionManager
-        startActivityForResult(manager.createScreenCaptureIntent(), 102)
+        startActivityForResult(manager.createScreenCaptureIntent(), 200)
     }
     
-    private fun startService(resultCode: Int, data: Intent) {
+    private fun startTranslatorService(resultCode: Int, data: Intent) {
         val intent = Intent(this, FloatingTranslatorService::class.java)
         intent.putExtra("resultCode", resultCode)
         intent.putExtra("resultData", data)
@@ -79,8 +79,16 @@ class MainActivity : AppCompatActivity() {
         super.onActivityResult(requestCode, resultCode, data)
         
         when (requestCode) {
-            100 -> if (checkOverlay()) startScreenCapture()
-            102 -> if (resultCode == RESULT_OK && data != null) startService(resultCode, data)
+            100 -> {
+                if (checkOverlayPermission()) {
+                    requestScreenCapture()
+                }
+            }
+            200 -> {
+                if (resultCode == RESULT_OK && data != null) {
+                    startTranslatorService(resultCode, data)
+                }
+            }
         }
     }
     
