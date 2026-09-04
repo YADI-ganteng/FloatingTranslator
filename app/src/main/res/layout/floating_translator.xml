@@ -27,8 +27,6 @@
             android:layout_height="wrap_content"
             android:text="Copy"
             android:textSize="12sp"
-            android:minWidth="0"
-            android:minHeight="0"
             android:padding="8dp"/>
         
         <View
@@ -36,7 +34,6 @@
             android:layout_width="24dp"
             android:layout_height="24dp"
             android:background="?attr/selectableItemBackgroundBorderless"/>
-        
     </LinearLayout>
     
     <TextView
