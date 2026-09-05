@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Floating Translator</string>
+    <string name="app_name">Penerjemah Melayang By Yad</string>
+    <string name="credit_text">Created by Yad</string>
+    <string name="credit_detail">Pembuat: Yad\nCoding: Yad\nDesign: Yad\n© 2026 All Rights Reserved</string>
 </resources>
