@@ -164,8 +164,8 @@ class FloatingTranslatorService : Service() {
         
         imageReader = ImageReader.newInstance(screenWidth, screenHeight, PixelFormat.RGBA_8888, 2)
         
-        // Gunakan getIntent() bukan intent langsung
-        val serviceIntent = intent
+        // FIX: Gunakan getIntent() bukan intent langsung
+        val serviceIntent = getIntent()
         val resultCode = serviceIntent?.getIntExtra("resultCode", 0) ?: 0
         
         val resultData: Intent? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
