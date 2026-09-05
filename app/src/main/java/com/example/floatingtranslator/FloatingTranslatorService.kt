@@ -27,7 +27,6 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
 import android.widget.Button
-import android.widget.EditText
 import android.widget.TextView
 import android.widget.Toast
 import androidx.core.app.NotificationCompat
@@ -51,9 +50,7 @@ class FloatingTranslatorService : Service() {
     private var translatedTextView: TextView? = null
     private var translatedTextFull: TextView? = null
     private var translationArea: View? = null
-    private var inputArea: View? = null
     private var creditArea: View? = null
-    private var inputText: EditText? = null
     private var translator: com.google.mlkit.nl.translate.Translator? = null
     private var textRecognizer: com.google.mlkit.vision.text.TextRecognizer? = null
     
@@ -72,8 +69,7 @@ class FloatingTranslatorService : Service() {
     private var serviceIntent: Intent? = null
     private var isSetup = false
     
-    // Area crop untuk OCR (hanya area dalam kotak)
-    private val CROP_SIZE = 100 // pixel area sekitar floating widget
+    private val CROP_SIZE = 150
     
     override fun onBind(intent: Intent?): IBinder? = null
     
@@ -95,7 +91,6 @@ class FloatingTranslatorService : Service() {
             
             textRecognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
             
-            // Translator ID -> EN
             val options = TranslatorOptions.Builder()
                 .setSourceLanguage(TranslateLanguage.INDONESIAN)
                 .setTargetLanguage(TranslateLanguage.ENGLISH)
@@ -125,25 +120,18 @@ class FloatingTranslatorService : Service() {
             translatedTextView = view.findViewById(R.id.translatedTextView)
             translatedTextFull = view.findViewById(R.id.translatedTextFull)
             translationArea = view.findViewById(R.id.translationArea)
-            inputArea = view.findViewById(R.id.inputArea)
             creditArea = view.findViewById(R.id.creditArea)
-            inputText = view.findViewById(R.id.inputText)
             
             val btnCopy = view.findViewById<Button>(R.id.btnCopy)
             val btnClose = view.findViewById<Button>(R.id.btnClose)
-            val btnWrite = view.findViewById<Button>(R.id.btnWrite)
             val btnCredit = view.findViewById<Button>(R.id.btnCredit)
-            val btnTranslate = view.findViewById<Button>(R.id.btnTranslate)
             val dragHandle = view.findViewById<View>(R.id.dragHandle)
             
-            // Copy + Auto-hapus
             btnCopy.setOnClickListener {
                 if (lastTranslatedText.isNotEmpty()) {
                     val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                     clipboard.setPrimaryClip(ClipData.newPlainText("Translated", lastTranslatedText))
-                    Toast.makeText(this, "✅ Tersalin! Teks dihapus.", Toast.LENGTH_SHORT).show()
-                    
-                    // Auto-hapus setelah copy
+                    Toast.makeText(this, "✅ Tersalin!", Toast.LENGTH_SHORT).show()
                     lastTranslatedText = ""
                     translatedTextFull?.text = "..."
                     translationArea?.visibility = View.GONE
@@ -151,42 +139,22 @@ class FloatingTranslatorService : Service() {
                 }
             }
             
-            // Tombol tulis
-            btnWrite.setOnClickListener {
-                inputArea?.visibility = View.VISIBLE
-                translationArea?.visibility = View.GONE
-                creditArea?.visibility = View.GONE
-            }
-            
-            // Tombol credit
             btnCredit.setOnClickListener {
                 creditArea?.visibility = View.VISIBLE
                 translationArea?.visibility = View.GONE
-                inputArea?.visibility = View.GONE
-            }
-            
-            // Terjemahkan teks input
-            btnTranslate.setOnClickListener {
-                val text = inputText?.text?.toString() ?: ""
-                if (text.isNotEmpty()) {
-                    translateText(text)
-                    inputArea?.visibility = View.GONE
-                    translationArea?.visibility = View.VISIBLE
-                }
             }
             
             btnClose.setOnClickListener {
                 translationArea?.visibility = View.GONE
-                inputArea?.visibility = View.GONE
                 creditArea?.visibility = View.GONE
             }
             
-            // Tap untuk expand
             dragHandle.setOnClickListener {
                 if (translationArea?.visibility == View.VISIBLE) {
                     translationArea?.visibility = View.GONE
                 } else {
                     translationArea?.visibility = View.VISIBLE
+                    creditArea?.visibility = View.GONE
                 }
             }
             
@@ -237,9 +205,7 @@ class FloatingTranslatorService : Service() {
                 MotionEvent.ACTION_MOVE -> {
                     val deltaX = event.rawX - touchX
                     val deltaY = event.rawY - touchY
-                    if (Math.abs(deltaX) > 5 || Math.abs(deltaY) > 5) {
-                        isDragging = true
-                    }
+                    if (Math.abs(deltaX) > 5 || Math.abs(deltaY) > 5) isDragging = true
                     if (isDragging) {
                         params.x = initialX + deltaX.toInt()
                         params.y = initialY + deltaY.toInt()
@@ -250,9 +216,7 @@ class FloatingTranslatorService : Service() {
                     true
                 }
                 MotionEvent.ACTION_UP -> {
-                    if (!isDragging) {
-                        view.performClick()
-                    }
+                    if (!isDragging) view.performClick()
                     true
                 }
                 else -> false
@@ -264,6 +228,7 @@ class FloatingTranslatorService : Service() {
         try {
             val wm = windowManager ?: return
             val metrics = DisplayMetrics()
+            @Suppress("DEPRECATION")
             wm.defaultDisplay.getRealMetrics(metrics)
             screenWidth = metrics.widthPixels
             screenHeight = metrics.heightPixels
@@ -320,6 +285,10 @@ class FloatingTranslatorService : Service() {
                 val rowStride = plane.rowStride
                 val rowPadding = rowStride - pixelStride * screenWidth
                 
+                // Gunakan ukuran lebih kecil untuk hindari OOM
+                val scaledWidth = screenWidth / 2
+                val scaledHeight = screenHeight / 2
+                
                 val fullBitmap = Bitmap.createBitmap(
                     screenWidth + rowPadding / pixelStride,
                     screenHeight,
@@ -327,13 +296,10 @@ class FloatingTranslatorService : Service() {
                 )
                 fullBitmap.copyPixelsFromBuffer(buffer)
                 
-                // CROP HANYA AREA DALAM KOTAK
+                // Crop area
                 val cropX = (areaX - CROP_SIZE/2).coerceIn(0, screenWidth - CROP_SIZE)
                 val cropY = (areaY - CROP_SIZE/2).coerceIn(0, screenHeight - CROP_SIZE)
-                
-                val croppedBitmap = Bitmap.createBitmap(
-                    fullBitmap, cropX, cropY, CROP_SIZE, CROP_SIZE
-                )
+                val croppedBitmap = Bitmap.createBitmap(fullBitmap, cropX, cropY, CROP_SIZE, CROP_SIZE)
                 
                 val inputImage = InputImage.fromBitmap(croppedBitmap, 0)
                 
@@ -360,7 +326,6 @@ class FloatingTranslatorService : Service() {
     
     private fun translateText(text: String) {
         val trans = translator ?: return
-        
         trans.translate(text)
             .addOnSuccessListener { translatedText ->
                 lastTranslatedText = translatedText
@@ -373,7 +338,7 @@ class FloatingTranslatorService : Service() {
             }
             .addOnFailureListener {
                 translatedTextFull?.post {
-                    translatedTextFull?.text = "Gagal menerjemahkan"
+                    translatedTextFull?.text = "Gagal"
                 }
             }
     }
