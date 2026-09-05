@@ -10,88 +10,113 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 
 class MainActivity : AppCompatActivity() {
-    
+
     private lateinit var btnStart: Button
     private lateinit var btnStop: Button
-    
+    private var resultCode = 0
+    private var resultData: Intent? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-        
+
         btnStart = findViewById(R.id.btnStart)
         btnStop = findViewById(R.id.btnStop)
-        
+
         btnStart.setOnClickListener {
-            if (checkOverlayPermission()) {
-                requestScreenCapture()
-            }
+            startTranslator()
         }
-        
+
         btnStop.setOnClickListener {
+            stopTranslator()
+        }
+
+        updateButtons()
+    }
+
+    private fun startTranslator() {
+        try {
+            // Android 6+ butuh overlay permission
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                if (!Settings.canDrawOverlays(this)) {
+                    val intent = Intent(
+                        Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                        Uri.parse("package:$packageName")
+                    )
+                    startActivityForResult(intent, 100)
+                    return
+                }
+            }
+
+            // Request screen capture
+            val manager = getSystemService(MEDIA_PROJECTION_SERVICE) as android.media.projection.MediaProjectionManager
+            startActivityForResult(manager.createScreenCaptureIntent(), 200)
+
+        } catch (e: Exception) {
+            Toast.makeText(this, "Error: ${e.message}", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun stopTranslator() {
+        try {
             stopService(Intent(this, FloatingTranslatorService::class.java))
             updateButtons()
+        } catch (e: Exception) {
+            // Ignore
         }
-        
-        updateButtons()
     }
-    
-    private fun checkOverlayPermission(): Boolean {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            if (!Settings.canDrawOverlays(this)) {
-                val intent = Intent(
-                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                    Uri.parse("package:$packageName")
-                )
-                startActivityForResult(intent, 100)
-                return false
+
+    private fun startFloatingService() {
+        try {
+            val intent = Intent(this, FloatingTranslatorService::class.java)
+            intent.putExtra("resultCode", resultCode)
+            intent.putExtra("resultData", resultData)
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(intent)
+            } else {
+                startService(intent)
             }
+
+            Toast.makeText(this, "Penerjemah dimulai!", Toast.LENGTH_SHORT).show()
+            updateButtons()
+
+        } catch (e: Exception) {
+            Toast.makeText(this, "Gagal: ${e.message}", Toast.LENGTH_LONG).show()
         }
-        return true
     }
-    
-    private fun requestScreenCapture() {
-        val manager = getSystemService(MEDIA_PROJECTION_SERVICE) as android.media.projection.MediaProjectionManager
-        startActivityForResult(manager.createScreenCaptureIntent(), 200)
-    }
-    
-    private fun startTranslatorService(resultCode: Int, data: Intent) {
-        val intent = Intent(this, FloatingTranslatorService::class.java)
-        intent.putExtra("resultCode", resultCode)
-        intent.putExtra("resultData", data)
-        
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            startForegroundService(intent)
-        } else {
-            startService(intent)
-        }
-        
-        Toast.makeText(this, "Penerjemah dimulai!", Toast.LENGTH_SHORT).show()
-        updateButtons()
-    }
-    
+
     private fun updateButtons() {
-        val running = FloatingTranslatorService.isRunning
-        btnStart.isEnabled = !running
-        btnStop.isEnabled = running
+        try {
+            val running = FloatingTranslatorService.isRunning
+            btnStart.isEnabled = !running
+            btnStop.isEnabled = running
+        } catch (e: Exception) {
+            // Ignore
+        }
     }
-    
+
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        
+
         when (requestCode) {
             100 -> {
-                if (checkOverlayPermission()) {
-                    requestScreenCapture()
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    if (Settings.canDrawOverlays(this)) {
+                        startTranslator()
+                    }
                 }
             }
             200 -> {
                 if (resultCode == RESULT_OK && data != null) {
-                    startTranslatorService(resultCode, data)
+                    this.resultCode = resultCode
+                    this.resultData = data
+                    startFloatingService()
                 }
             }
         }
     }
-    
+
     override fun onResume() {
         super.onResume()
         updateButtons()
