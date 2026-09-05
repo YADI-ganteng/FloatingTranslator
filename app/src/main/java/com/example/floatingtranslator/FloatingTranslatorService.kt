@@ -39,212 +39,238 @@ import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 
 class FloatingTranslatorService : Service() {
-    
+
     companion object {
         @JvmStatic
         var isRunning = false
     }
-    
-    private lateinit var windowManager: WindowManager
-    private lateinit var floatingView: View
-    private lateinit var translatedTextView: TextView
-    private lateinit var translator: com.google.mlkit.nl.translate.Translator
-    private lateinit var textRecognizer: com.google.mlkit.vision.text.TextRecognizer
-    
+
+    private var windowManager: WindowManager? = null
+    private var floatingView: View? = null
+    private var translatedTextView: TextView? = null
+    private var translator: com.google.mlkit.nl.translate.Translator? = null
+    private var textRecognizer: com.google.mlkit.vision.text.TextRecognizer? = null
+
     private var mediaProjection: MediaProjection? = null
     private var virtualDisplay: VirtualDisplay? = null
     private var imageReader: ImageReader? = null
     private var screenWidth = 0
     private var screenHeight = 0
     private var screenDensity = 0
-    
+
     private val handler = Handler(Looper.getMainLooper())
     private var lastTranslatedText = ""
     private var areaX = 0
     private var areaY = 100
     private var ocrRunning = false
-    
-    // Simpan intent dari onStartCommand
     private var serviceIntent: Intent? = null
-    
-    override fun onBind(intent: Intent?): IBinder? {
-        return null
-    }
-    
+    private var isSetup = false
+
+    override fun onBind(intent: Intent?): IBinder? = null
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        // Simpan intent
         serviceIntent = intent
-        
-        // Setup screen capture jika belum
-        if (mediaProjection == null && ::windowManager.isInitialized) {
+
+        if (!isSetup) {
+            setupService()
+        } else {
             setupScreenCapture()
         }
-        
+
         return START_STICKY
     }
-    
-    override fun onCreate() {
-        super.onCreate()
-        isRunning = true
-        windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
-        
-        createNotificationChannel()
-        startForeground(1, createNotification())
-        
-        textRecognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
-        
-        val options = TranslatorOptions.Builder()
-            .setSourceLanguage(TranslateLanguage.ENGLISH)
-            .setTargetLanguage(TranslateLanguage.INDONESIAN)
-            .build()
-        translator = Translation.getClient(options)
-        
-        translator.downloadModelIfNeeded(DownloadConditions.Builder().build())
-        
-        setupFloatingWindow()
-        startOCRLoop()
-    }
-    
-    private fun setupFloatingWindow() {
-        val inflater = getSystemService(Context.LAYOUT_INFLATER_SERVICE) as LayoutInflater
-        floatingView = inflater.inflate(R.layout.floating_translator, null)
-        
-        translatedTextView = floatingView.findViewById(R.id.translatedTextView)
-        val btnCopy = floatingView.findViewById<Button>(R.id.btnCopy)
-        val btnClose = floatingView.findViewById<View>(R.id.btnClose)
-        
-        btnCopy.setOnClickListener {
-            if (lastTranslatedText.isNotEmpty()) {
-                val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                clipboard.setPrimaryClip(ClipData.newPlainText("Translated", lastTranslatedText))
-                Toast.makeText(this, "Teks disalin!", Toast.LENGTH_SHORT).show()
-            }
-        }
-        
-        btnClose.setOnClickListener {
+
+    private fun setupService() {
+        try {
+            windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
+
+            createNotificationChannel()
+            startForeground(1, createNotification())
+
+            textRecognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+
+            val options = TranslatorOptions.Builder()
+                .setSourceLanguage(TranslateLanguage.ENGLISH)
+                .setTargetLanguage(TranslateLanguage.INDONESIAN)
+                .build()
+            translator = Translation.getClient(options)
+
+            translator?.downloadModelIfNeeded(DownloadConditions.Builder().build())
+
+            setupFloatingWindow()
+            setupScreenCapture()
+            startOCRLoop()
+
+            isSetup = true
+            isRunning = true
+
+        } catch (e: Exception) {
+            e.printStackTrace()
             stopSelf()
         }
-        
-        val params = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.WRAP_CONTENT,
-            WindowManager.LayoutParams.WRAP_CONTENT,
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
-                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-            else
-                WindowManager.LayoutParams.TYPE_PHONE,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
-            PixelFormat.TRANSLUCENT
-        )
-        
-        params.gravity = Gravity.TOP or Gravity.START
-        params.x = areaX
-        params.y = areaY
-        
-        windowManager.addView(floatingView, params)
-        
-        var initialX = 0
-        var initialY = 0
-        var touchX = 0f
-        var touchY = 0f
-        
-        floatingView.setOnTouchListener { _, event ->
-            when (event.action) {
-                MotionEvent.ACTION_DOWN -> {
-                    initialX = params.x
-                    initialY = params.y
-                    touchX = event.rawX
-                    touchY = event.rawY
-                    true
+    }
+
+    private fun setupFloatingWindow() {
+        try {
+            val wm = windowManager ?: return
+            val inflater = getSystemService(Context.LAYOUT_INFLATER_SERVICE) as LayoutInflater
+            val view = inflater.inflate(R.layout.floating_translator, null)
+            floatingView = view
+
+            translatedTextView = view.findViewById(R.id.translatedTextView)
+            val btnCopy = view.findViewById<Button>(R.id.btnCopy)
+            val btnClose = view.findViewById<View>(R.id.btnClose)
+
+            btnCopy.setOnClickListener {
+                if (lastTranslatedText.isNotEmpty()) {
+                    val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                    clipboard.setPrimaryClip(ClipData.newPlainText("Translated", lastTranslatedText))
+                    Toast.makeText(this, "Teks disalin!", Toast.LENGTH_SHORT).show()
                 }
-                MotionEvent.ACTION_MOVE -> {
-                    params.x = initialX + (event.rawX - touchX).toInt()
-                    params.y = initialY + (event.rawY - touchY).toInt()
-                    areaX = params.x
-                    areaY = params.y
-                    windowManager.updateViewLayout(floatingView, params)
-                    true
-                }
-                else -> false
             }
-        }
-    }
-    
-    private fun setupScreenCapture() {
-        val metrics = DisplayMetrics()
-        windowManager.defaultDisplay.getRealMetrics(metrics)
-        screenWidth = metrics.widthPixels
-        screenHeight = metrics.heightPixels
-        screenDensity = metrics.densityDpi
-        
-        imageReader = ImageReader.newInstance(screenWidth, screenHeight, PixelFormat.RGBA_8888, 2)
-        
-        // Gunakan serviceIntent yang disimpan
-        val resultCode = serviceIntent?.getIntExtra("resultCode", 0) ?: 0
-        
-        val resultData: Intent? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            serviceIntent?.getParcelableExtra("resultData", Intent::class.java)
-        } else {
-            @Suppress("DEPRECATION")
-            serviceIntent?.getParcelableExtra("resultData")
-        }
-        
-        if (resultCode != 0 && resultData != null) {
-            val manager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
-            mediaProjection = manager.getMediaProjection(resultCode, resultData)
-            
-            virtualDisplay = mediaProjection?.createVirtualDisplay(
-                "FloatingTranslator",
-                screenWidth,
-                screenHeight,
-                screenDensity,
-                DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
-                imageReader?.surface,
-                null,
-                null
+
+            btnClose.setOnClickListener { stopSelf() }
+
+            // Gunakan TYPE_PHONE untuk Android 7 ke bawah
+            val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+            } else {
+                @Suppress("DEPRECATION")
+                WindowManager.LayoutParams.TYPE_PHONE
+            }
+
+            val params = WindowManager.LayoutParams(
+                WindowManager.LayoutParams.WRAP_CONTENT,
+                WindowManager.LayoutParams.WRAP_CONTENT,
+                type,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+                PixelFormat.TRANSLUCENT
             )
+
+            params.gravity = Gravity.TOP or Gravity.START
+            params.x = areaX
+            params.y = areaY
+
+            wm.addView(view, params)
+
+            var initialX = 0
+            var initialY = 0
+            var touchX = 0f
+            var touchY = 0f
+
+            view.setOnTouchListener { _, event ->
+                when (event.action) {
+                    MotionEvent.ACTION_DOWN -> {
+                        initialX = params.x
+                        initialY = params.y
+                        touchX = event.rawX
+                        touchY = event.rawY
+                        true
+                    }
+                    MotionEvent.ACTION_MOVE -> {
+                        params.x = initialX + (event.rawX - touchX).toInt()
+                        params.y = initialY + (event.rawY - touchY).toInt()
+                        areaX = params.x
+                        areaY = params.y
+                        wm.updateViewLayout(view, params)
+                        true
+                    }
+                    else -> false
+                }
+            }
+
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
     }
-    
+
+    private fun setupScreenCapture() {
+        try {
+            val wm = windowManager ?: return
+
+            val metrics = DisplayMetrics()
+            wm.defaultDisplay.getRealMetrics(metrics)
+            screenWidth = metrics.widthPixels
+            screenHeight = metrics.heightPixels
+            screenDensity = metrics.densityDpi
+
+            imageReader = ImageReader.newInstance(screenWidth, screenHeight, PixelFormat.RGBA_8888, 2)
+
+            val intent = serviceIntent
+            val resultCode = intent?.getIntExtra("resultCode", 0) ?: 0
+
+            val resultData: Intent? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                intent?.getParcelableExtra("resultData", Intent::class.java)
+            } else {
+                @Suppress("DEPRECATION")
+                intent?.getParcelableExtra("resultData")
+            }
+
+            if (resultCode != 0 && resultData != null && mediaProjection == null) {
+                val manager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+                mediaProjection = manager.getMediaProjection(resultCode, resultData)
+
+                virtualDisplay = mediaProjection?.createVirtualDisplay(
+                    "FloatingTranslator",
+                    screenWidth,
+                    screenHeight,
+                    screenDensity,
+                    DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
+                    imageReader?.surface,
+                    null,
+                    null
+                )
+            }
+
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
     private fun startOCRLoop() {
         handler.post(object : Runnable {
             override fun run() {
                 captureAndTranslate()
-                handler.postDelayed(this, 3000)
+                handler.postDelayed(this, 5000) // 5 detik untuk hemat baterai
             }
         })
     }
-    
+
     private fun captureAndTranslate() {
         if (ocrRunning) return
         ocrRunning = true
-        
+
         try {
-            val image = imageReader?.acquireLatestImage()
+            val reader = imageReader ?: run { ocrRunning = false; return }
+            val recognizer = textRecognizer ?: run { ocrRunning = false; return }
+            val trans = translator ?: run { ocrRunning = false; return }
+
+            val image = reader.acquireLatestImage()
             if (image != null) {
                 val plane = image.planes[0]
                 val buffer = plane.buffer
                 val pixelStride = plane.pixelStride
                 val rowStride = plane.rowStride
                 val rowPadding = rowStride - pixelStride * screenWidth
-                
+
                 val bitmap = Bitmap.createBitmap(
                     screenWidth + rowPadding / pixelStride,
                     screenHeight,
                     Bitmap.Config.ARGB_8888
                 )
                 bitmap.copyPixelsFromBuffer(buffer)
-                
+
                 val inputImage = InputImage.fromBitmap(bitmap, 0)
-                
-                textRecognizer.process(inputImage)
+
+                recognizer.process(inputImage)
                     .addOnSuccessListener { visionText ->
                         val detectedText = visionText.text
                         if (detectedText.isNotEmpty()) {
-                            translator.translate(detectedText)
+                            trans.translate(detectedText)
                                 .addOnSuccessListener { translatedText ->
                                     lastTranslatedText = translatedText
-                                    translatedTextView.post {
-                                        translatedTextView.text = translatedText
+                                    translatedTextView?.post {
+                                        translatedTextView?.text = translatedText
                                     }
                                 }
                         }
@@ -257,11 +283,12 @@ class FloatingTranslatorService : Service() {
             } else {
                 ocrRunning = false
             }
+
         } catch (e: Exception) {
             ocrRunning = false
         }
     }
-    
+
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
@@ -269,19 +296,17 @@ class FloatingTranslatorService : Service() {
                 "Penerjemah Melayang",
                 NotificationManager.IMPORTANCE_LOW
             )
-            getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
+            getSystemService(NotificationManager::class.java)?.createNotificationChannel(channel)
         }
     }
-    
+
     private fun createNotification(): Notification {
         val notificationIntent = Intent(this, MainActivity::class.java)
         val pendingIntent = PendingIntent.getActivity(
-            this,
-            0,
-            notificationIntent,
+            this, 0, notificationIntent,
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
-        
+
         return NotificationCompat.Builder(this, "floating_translator")
             .setContentTitle("Penerjemah Melayang")
             .setContentText("Geser area transparan ke teks")
@@ -290,18 +315,17 @@ class FloatingTranslatorService : Service() {
             .setOngoing(true)
             .build()
     }
-    
+
     override fun onDestroy() {
         super.onDestroy()
         isRunning = false
         handler.removeCallbacksAndMessages(null)
-        virtualDisplay?.release()
-        mediaProjection?.stop()
-        imageReader?.close()
-        if (::floatingView.isInitialized) {
-            windowManager.removeView(floatingView)
-        }
-        translator.close()
-        textRecognizer.close()
+
+        try { virtualDisplay?.release() } catch (e: Exception) {}
+        try { mediaProjection?.stop() } catch (e: Exception) {}
+        try { imageReader?.close() } catch (e: Exception) {}
+        try { floatingView?.let { windowManager?.removeView(it) } } catch (e: Exception) {}
+        try { translator?.close() } catch (e: Exception) {}
+        try { textRecognizer?.close() } catch (e: Exception) {}
     }
 }
