@@ -1,50 +1,94 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="300dp"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="wrap_content"
     android:layout_height="wrap_content"
-    android:orientation="vertical"
     android:background="@drawable/floating_background"
-    android:padding="12dp">
+    android:padding="8dp">
     
     <LinearLayout
-        android:layout_width="match_parent"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical">
+        android:orientation="vertical"
+        android:gravity="center">
         
-        <TextView
-            android:layout_width="0dp"
+        <!-- Tombol utama yang bisa digeser -->
+        <LinearLayout
+            android:id="@+id/dragHandle"
+            android:layout_width="56dp"
+            android:layout_height="56dp"
+            android:orientation="horizontal"
+            android:gravity="center"
+            android:background="@drawable/floating_background">
+            
+            <TextView
+                android:id="@+id/translatedTextView"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="🌍"
+                android:textSize="24sp"
+                android:gravity="center"/>
+            
+        </LinearLayout>
+        
+        <!-- Area hasil terjemahan (expandable) -->
+        <LinearLayout
+            android:id="@+id/translationArea"
+            android:layout_width="200dp"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="Terjemahan"
-            android:textColor="#ffffff"
-            android:textStyle="bold"
-            android:textSize="14sp"/>
+            android:orientation="vertical"
+            android:background="#CC000000"
+            android:padding="8dp"
+            android:visibility="gone">
+            
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Terjemahan:"
+                android:textColor="#FFFFFF"
+                android:textSize="12sp"
+                android:textStyle="bold"/>
+            
+            <TextView
+                android:id="@+id/translatedTextFull"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Hasil terjemahan..."
+                android:textColor="#FFFFFF"
+                android:textSize="14sp"
+                android:layout_marginTop="4dp"/>
+            
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="end"
+                android:layout_marginTop="8dp">
+                
+                <Button
+                    android:id="@+id/btnCopy"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Copy"
+                    android:textSize="12sp"
+                    android:minWidth="0"
+                    android:minHeight="0"
+                    android:padding="8dp"/>
+                
+                <Button
+                    android:id="@+id/btnClose"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="✕"
+                    android:textSize="12sp"
+                    android:minWidth="0"
+                    android:minHeight="0"
+                    android:padding="8dp"
+                    android:layout_marginStart="8dp"/>
+                
+            </LinearLayout>
+            
+        </LinearLayout>
         
-        <Button
-            android:id="@+id/btnCopy"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Copy"
-            android:textSize="12sp"
-            android:padding="8dp"/>
-        
-        <View
-            android:id="@+id/btnClose"
-            android:layout_width="24dp"
-            android:layout_height="24dp"
-            android:background="?attr/selectableItemBackgroundBorderless"/>
     </LinearLayout>
     
-    <TextView
-        android:id="@+id/translatedTextView"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Hasil terjemahan muncul di sini"
-        android:textColor="#ffffff"
-        android:textSize="16sp"
-        android:padding="8dp"
-        android:background="#33000000"
-        android:layout_marginTop="4dp"/>
-    
-</LinearLayout>
+</FrameLayout>
