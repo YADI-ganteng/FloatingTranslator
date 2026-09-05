@@ -64,8 +64,23 @@ class FloatingTranslatorService : Service() {
     private var areaY = 100
     private var ocrRunning = false
     
+    // Simpan intent dari onStartCommand
+    private var serviceIntent: Intent? = null
+    
     override fun onBind(intent: Intent?): IBinder? {
         return null
+    }
+    
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        // Simpan intent
+        serviceIntent = intent
+        
+        // Setup screen capture jika belum
+        if (mediaProjection == null && ::windowManager.isInitialized) {
+            setupScreenCapture()
+        }
+        
+        return START_STICKY
     }
     
     override fun onCreate() {
@@ -87,7 +102,6 @@ class FloatingTranslatorService : Service() {
         translator.downloadModelIfNeeded(DownloadConditions.Builder().build())
         
         setupFloatingWindow()
-        setupScreenCapture()
         startOCRLoop()
     }
     
@@ -164,8 +178,7 @@ class FloatingTranslatorService : Service() {
         
         imageReader = ImageReader.newInstance(screenWidth, screenHeight, PixelFormat.RGBA_8888, 2)
         
-        // FIX: Gunakan getIntent() bukan intent langsung
-        val serviceIntent = getIntent()
+        // Gunakan serviceIntent yang disimpan
         val resultCode = serviceIntent?.getIntExtra("resultCode", 0) ?: 0
         
         val resultData: Intent? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
