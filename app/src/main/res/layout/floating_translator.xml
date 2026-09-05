@@ -29,50 +29,6 @@
             
         </LinearLayout>
         
-        <!-- Area input teks -->
-        <LinearLayout
-            android:id="@+id/inputArea"
-            android:layout_width="180dp"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:background="#DD1a1a2e"
-            android:padding="8dp"
-            android:visibility="gone"
-            android:layout_marginTop="4dp">
-            
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="✏️ Tulis Teks:"
-                android:textColor="#4CAF50"
-                android:textSize="11sp"
-                android:textStyle="bold"/>
-            
-            <EditText
-                android:id="@+id/inputText"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:hint="Ketik di sini..."
-                android:textColor="#FFFFFF"
-                android:textColorHint="#888888"
-                android:textSize="13sp"
-                android:background="@drawable/input_background"
-                android:padding="8dp"
-                android:layout_marginTop="4dp"
-                android:maxLines="3"/>
-            
-            <Button
-                android:id="@+id/btnTranslate"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="🔄 Terjemahkan"
-                android:textSize="11sp"
-                android:padding="6dp"
-                android:layout_marginTop="4dp"
-                android:backgroundTint="#4CAF50"/>
-            
-        </LinearLayout>
-        
         <!-- Area hasil terjemahan -->
         <LinearLayout
             android:id="@+id/translationArea"
@@ -87,7 +43,7 @@
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="📝 Hasil:"
+                android:text="📝 Hasil Terjemahan:"
                 android:textColor="#4CAF50"
                 android:textSize="11sp"
                 android:textStyle="bold"/>
